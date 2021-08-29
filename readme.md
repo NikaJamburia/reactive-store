@@ -1,0 +1,1 @@
+A simple e-commerce project written using microservice architecture and reactive approaches.
