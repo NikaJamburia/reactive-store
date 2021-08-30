@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class OrderEventsProcessor implements EventProcessor<Order, OrderEvent> {
 
     private final OrderEventStore orderEventStore;
-    private final Sinks.Many<OrderEvent> eventsSink = Sinks.many().multicast().onBackpressureBuffer();
+    private final Sinks.Many<OrderEvent> orderEventsSink;
 
     @Override
     public Flux<Order> streamState(Id orderId) {
@@ -30,29 +30,28 @@ public class OrderEventsProcessor implements EventProcessor<Order, OrderEvent> {
     public Flux<OrderEvent> streamEvents(Id orderId) {
         return Flux.create(sink ->
                 orderEventStore.findAllByEntityIdOrderByEventCreateTimeAsc(orderId)
-                    .concatWith(eventsSink.asFlux().filter(ev -> ev.getEntityId().equals(orderId)))
+                    .concatWith(orderEventsSink.asFlux().filter(ev -> ev.getEntityId().equals(orderId)))
                     .subscribe(sink::next, sink::error));
     }
 
     @Override
     public Flux<OrderEvent> streamEvents(Class<? extends OrderEvent> eventType) {
         return Flux.create(sink ->
-                orderEventStore.findEventsByClassNameOrderByEventCreateTimeAsc(eventType.getName())
-                        .concatWith(eventsSink.asFlux())
+                orderEventsSink.asFlux()
                         .filter(event -> event.getClass() == eventType)
                         .subscribe(sink::next, sink::error));
     }
 
     @Override
     public Mono<Void> publish(OrderEvent event) {
-        eventsSink.tryEmitNext(event);
+        orderEventsSink.tryEmitNext(event);
         return Mono.create(sink -> orderEventStore.save(event).subscribe(value -> sink.success()));
     }
 
     @Override
-    public Mono<Order> reconstructStateOn(Id entityId, LocalDateTime time) {
+    public Mono<Order> reconstructState(Id entityId, LocalDateTime time) {
         return orderEventStore
-                .findAllByEntityIdAndEventCreateTimeBeforeOrderByEventCreateTimeAsc(entityId, time)
+                .findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(entityId, time)
                 .reduce(Order.empty(), (order, event) -> event.applyTo(order));
     }
 }

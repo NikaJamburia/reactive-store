@@ -7,13 +7,10 @@ import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-public interface OrderEventStore extends ReactiveMongoRepository<OrderEvent, String> {
+public interface OrderEventStore extends ReactiveMongoRepository<OrderEvent, UUID> {
 
-    Flux<OrderEvent> findAllOrderByEventCreateTimeAsc();
-    Flux<OrderEvent> findAllByEntityIdAndEventCreateTimeBeforeOrderByEventCreateTimeAsc(Id entityId, LocalDateTime time);
     Flux<OrderEvent> findAllByEntityIdOrderByEventCreateTimeAsc(Id entityId);
-
-    @Query(value="{ '_class' : ?0 }")
-    Flux<OrderEvent> findEventsByClassNameOrderByEventCreateTimeAsc(String className);
+    Flux<OrderEvent> findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(Id entityId, LocalDateTime time);
 }

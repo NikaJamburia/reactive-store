@@ -11,5 +11,5 @@ public interface EventProcessor<ENTITY, EVENT extends Event<ENTITY>> {
     Flux<EVENT> streamEvents(Id entityId);
     Flux<EVENT> streamEvents(Class<? extends EVENT> eventType);
     Mono<Void> publish(EVENT event);
-    Mono<ENTITY> reconstructStateOn(Id entityId, LocalDateTime time);
+    Mono<ENTITY> reconstructState(Id entityId, LocalDateTime time);
 }
