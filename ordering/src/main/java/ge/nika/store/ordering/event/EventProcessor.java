@@ -1,6 +1,8 @@
 package ge.nika.store.ordering.event;
 
+import ge.nika.store.ordering.domain.order.model.Order;
 import ge.nika.store.ordering.domain.value.Id;
+import ge.nika.store.ordering.snapshot.Snapshot;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -12,4 +14,5 @@ public interface EventProcessor<ENTITY, EVENT extends Event<ENTITY>> {
     Flux<EVENT> streamEvents(Class<? extends EVENT> eventType);
     Mono<Void> publish(EVENT event);
     Mono<ENTITY> reconstructState(Id entityId, LocalDateTime time);
+    Mono<ENTITY> reconstructStateUsingSnapshot(Id entityId, Snapshot<ENTITY> snapshot, LocalDateTime time);
 }

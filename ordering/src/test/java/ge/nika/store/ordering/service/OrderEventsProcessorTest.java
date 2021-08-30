@@ -5,6 +5,7 @@ import ge.nika.store.ordering.domain.order.event.OrderProcessed;
 import ge.nika.store.ordering.domain.order.event.OrderShipped;
 import ge.nika.store.ordering.domain.order.event.OrderSubmitted;
 import ge.nika.store.ordering.domain.order.model.OrderEvent;
+import ge.nika.store.ordering.domain.order.snapshot.OrderSnapshot;
 import ge.nika.store.ordering.domain.order.value.LineItem;
 import ge.nika.store.ordering.domain.value.Id;
 import ge.nika.store.ordering.repository.OrderEventStore;
@@ -16,6 +17,7 @@ import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import java.util.UUID;
 
 import static ge.nika.store.ordering.domain.order.model.OrderStatus.*;
 import static java.time.LocalDateTime.now;
@@ -33,7 +35,7 @@ public class OrderEventsProcessorTest {
     public void streamsStateOfAnOrder() {
 
         OrderEventStore eventStore = mock(OrderEventStore.class);
-        when(eventStore.findAllByEntityIdOrderByEventCreateTimeAsc(orderId)).thenReturn(Flux.just(
+        when(eventStore.getAllEvents(orderId)).thenReturn(Flux.just(
                 new OrderCreated(randomUUID(), orderId, now(), Set.of(mock(LineItem.class))),
                 new OrderSubmitted(randomUUID(), orderId, now()),
                 new OrderProcessed(randomUUID(), orderId, now()),
@@ -59,7 +61,7 @@ public class OrderEventsProcessorTest {
         LineItem lineItem = mock(LineItem.class);
 
         OrderEventStore eventStore = mock(OrderEventStore.class);
-        when(eventStore.findAllByEntityIdOrderByEventCreateTimeAsc(orderId)).thenReturn(Flux.just(
+        when(eventStore.getAllEvents(orderId)).thenReturn(Flux.just(
                 new OrderCreated(randomUUID(), orderId, now, Set.of(lineItem)),
                 new OrderSubmitted(randomUUID(), orderId, now),
                 new OrderProcessed(randomUUID(), orderId, now),
@@ -120,8 +122,7 @@ public class OrderEventsProcessorTest {
         LocalDateTime requestedTime = parse("2021-08-30T13:00:00");
 
         OrderEventStore eventStore = mock(OrderEventStore.class);
-        when(eventStore.findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, requestedTime))
-                .thenReturn(Flux.just(
+        when(eventStore.getEventsUpToTime(orderId, requestedTime)).thenReturn(Flux.just(
                         new OrderCreated(randomUUID(), orderId, requestedTime.minusMinutes(20), Set.of(mock(LineItem.class), mock(LineItem.class))),
                         new OrderSubmitted(randomUUID(), orderId, requestedTime.minusMinutes(15)),
                         new OrderProcessed(randomUUID(), orderId, requestedTime.minusMinutes(10)),
@@ -129,6 +130,26 @@ public class OrderEventsProcessorTest {
                 ));
 
         StepVerifier.create(new OrderEventsProcessor(eventStore, defaultSink).reconstructState(orderId, requestedTime))
+                .assertNext(order -> {
+                    assertEquals(SHIPPED, order.getStatus());
+                    assertEquals(requestedTime.minusMinutes(5), order.getUpdatedAt());
+                    assertEquals(2, order.getLineItems().size());
+                }).verifyComplete();
+    }
+
+    @Test
+    public void reconstructsStateWithSnapshot() {
+        LocalDateTime requestedTime = parse("2021-08-30T13:00:00");
+        LocalDateTime snapshotTime = parse("2021-08-30T12:00:00");
+
+        OrderEventStore eventStore = mock(OrderEventStore.class);
+        when(eventStore.getEventsInTimeFrame(orderId, snapshotTime, requestedTime)).thenReturn(Flux.just(
+                        new OrderProcessed(randomUUID(), orderId, requestedTime.minusMinutes(10)),
+                        new OrderShipped(randomUUID(), orderId, requestedTime.minusMinutes(5))
+                ));
+
+        OrderSnapshot flux = new OrderSnapshot(UUID.randomUUID(), snapshotTime, orderId, SUBMITTED, snapshotTime, Set.of(mock(LineItem.class), mock(LineItem.class)));
+        StepVerifier.create(new OrderEventsProcessor(eventStore, defaultSink).reconstructStateUsingSnapshot(orderId, flux, requestedTime))
                 .assertNext(order -> {
                     assertEquals(SHIPPED, order.getStatus());
                     assertEquals(requestedTime.minusMinutes(5), order.getUpdatedAt());

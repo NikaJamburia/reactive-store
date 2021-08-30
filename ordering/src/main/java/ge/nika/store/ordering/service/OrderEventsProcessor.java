@@ -2,10 +2,12 @@ package ge.nika.store.ordering.service;
 
 import ge.nika.store.ordering.domain.order.model.Order;
 import ge.nika.store.ordering.domain.order.model.OrderEvent;
+import ge.nika.store.ordering.domain.order.snapshot.OrderSnapshot;
 import ge.nika.store.ordering.domain.value.Id;
 import ge.nika.store.ordering.event.EventProcessor;
 import ge.nika.store.ordering.event.StateStream;
 import ge.nika.store.ordering.repository.OrderEventStore;
+import ge.nika.store.ordering.snapshot.Snapshot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -29,7 +31,7 @@ public class OrderEventsProcessor implements EventProcessor<Order, OrderEvent> {
     @Override
     public Flux<OrderEvent> streamEvents(Id orderId) {
         return Flux.create(sink ->
-                orderEventStore.findAllByEntityIdOrderByEventCreateTimeAsc(orderId)
+                orderEventStore.getAllEvents(orderId)
                     .concatWith(orderEventsSink.asFlux().filter(ev -> ev.getEntityId().equals(orderId)))
                     .subscribe(sink::next, sink::error));
     }
@@ -51,7 +53,14 @@ public class OrderEventsProcessor implements EventProcessor<Order, OrderEvent> {
     @Override
     public Mono<Order> reconstructState(Id entityId, LocalDateTime time) {
         return orderEventStore
-                .findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(entityId, time)
+                .getEventsUpToTime(entityId, time)
                 .reduce(Order.empty(), (order, event) -> event.applyTo(order));
+    }
+
+    @Override
+    public Mono<Order> reconstructStateUsingSnapshot(Id entityId, Snapshot<Order> snapshot, LocalDateTime time) {
+        return orderEventStore
+                .getEventsInTimeFrame(entityId, snapshot.getCreatedAt(), time)
+                .reduce(snapshot.getSavedState(), (order, event) -> event.applyTo(order));
     }
 }

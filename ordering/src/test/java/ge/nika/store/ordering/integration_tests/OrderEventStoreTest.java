@@ -23,7 +23,6 @@ import static java.util.UUID.randomUUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataMongoTest
-//@SpringBootTest
 public class OrderEventStoreTest {
 
     @Autowired
@@ -57,7 +56,7 @@ public class OrderEventStoreTest {
                 new OrderSubmitted(randomUUID(), orderId, parse("2021-08-30T12:00:00.002"))
         )).blockLast();
 
-        StepVerifier.create(orderEventStore.findAllByEntityIdOrderByEventCreateTimeAsc(orderId))
+        StepVerifier.create(orderEventStore.getAllEvents(orderId))
                 .assertNext(event -> assertTrue(event instanceof OrderCreated))
                 .assertNext(event -> assertTrue(event instanceof OrderSubmitted))
                 .assertNext(event -> assertTrue(event instanceof OrderProcessed))
@@ -75,22 +74,22 @@ public class OrderEventStoreTest {
                 new OrderSubmitted(randomUUID(), orderId, parse("2021-08-30T12:00:00.002"))
         )).blockLast();
 
-        StepVerifier.create(orderEventStore.findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, parse("2021-08-30T12:00:00.001")))
+        StepVerifier.create(orderEventStore.getEventsUpToTime(orderId, parse("2021-08-30T12:00:00.001")))
                 .assertNext(event -> assertTrue(event instanceof OrderCreated))
                 .verifyComplete();
 
-        StepVerifier.create(orderEventStore.findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, parse("2021-08-30T12:00:00.002")))
+        StepVerifier.create(orderEventStore.getEventsUpToTime(orderId, parse("2021-08-30T12:00:00.002")))
                 .assertNext(event -> assertTrue(event instanceof OrderCreated))
                 .assertNext(event -> assertTrue(event instanceof OrderSubmitted))
                 .verifyComplete();
 
-        StepVerifier.create(orderEventStore.findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, parse("2021-08-30T12:00:00.003")))
+        StepVerifier.create(orderEventStore.getEventsUpToTime(orderId, parse("2021-08-30T12:00:00.003")))
                 .assertNext(event -> assertTrue(event instanceof OrderCreated))
                 .assertNext(event -> assertTrue(event instanceof OrderSubmitted))
                 .assertNext(event -> assertTrue(event instanceof OrderProcessed))
                 .verifyComplete();
 
-        StepVerifier.create(orderEventStore.findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, parse("2021-08-30T12:00:00.004")))
+        StepVerifier.create(orderEventStore.getEventsUpToTime(orderId, parse("2021-08-30T12:00:00.004")))
                 .assertNext(event -> assertTrue(event instanceof OrderCreated))
                 .assertNext(event -> assertTrue(event instanceof OrderSubmitted))
                 .assertNext(event -> assertTrue(event instanceof OrderProcessed))

@@ -13,4 +13,17 @@ public interface OrderEventStore extends ReactiveMongoRepository<OrderEvent, UUI
 
     Flux<OrderEvent> findAllByEntityIdOrderByEventCreateTimeAsc(Id entityId);
     Flux<OrderEvent> findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(Id entityId, LocalDateTime time);
+    Flux<OrderEvent> findAllByEntityIdAndEventCreateTimeGreaterThanEqualAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(Id entityId, LocalDateTime from, LocalDateTime to);
+
+    default Flux<OrderEvent> getAllEvents(Id orderId) {
+        return findAllByEntityIdOrderByEventCreateTimeAsc(orderId);
+    }
+
+    default Flux<OrderEvent> getEventsUpToTime(Id orderId, LocalDateTime time) {
+        return findAllByEntityIdAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, time);
+    }
+
+    default Flux<OrderEvent> getEventsInTimeFrame(Id orderId, LocalDateTime from, LocalDateTime to) {
+        return findAllByEntityIdAndEventCreateTimeGreaterThanEqualAndEventCreateTimeLessThanEqualOrderByEventCreateTimeAsc(orderId, from, to);
+    }
 }
